@@ -74,7 +74,7 @@ if not TELEGRAM_TOKEN:
 # ---------------- INITIALIZE SERVICES ----------------
 
 # Initialize database
-init_db(DATABASE_NAME)
+init_db()
 
 # Create agent and runner
 from agent.agent_setup import create_runner
