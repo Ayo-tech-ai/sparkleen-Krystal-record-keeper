@@ -119,7 +119,21 @@ if user_input:
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response_text, receipt_path = asyncio.run(get_response())
+            try:
+                response_text, receipt_path = asyncio.run(get_response())
+            except Exception as e:
+                error_str = str(e).lower()
+                if "resourceexhausted" in error_str or "quota" in error_str or "rate" in error_str:
+                    response_text = (
+                        "I'm a bit busy right now (API limit reached). "
+                        "Please wait a moment and try again."
+                    )
+                else:
+                    response_text = (
+                        "Something went wrong on my end. Please try that again."
+                    )
+                receipt_path = None
+
             st.markdown(response_text)
             if receipt_path:
                 with open(receipt_path, "rb") as f:
