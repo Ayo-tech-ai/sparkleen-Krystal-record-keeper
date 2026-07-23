@@ -2,11 +2,22 @@ import streamlit as st
 import pandas as pd
 import asyncio
 from datetime import date
+import os
 
 from core.database import init_db
 from core.service import record_service
 from core.receipt import generate_receipt
 from agent.agent_setup import create_runner
+
+if "GOOGLE_API_KEY" not in os.environ:
+    try:
+        os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        st.error(
+            "GOOGLE_API_KEY not found. Add it to .streamlit/secrets.toml "
+            "locally, or to your Streamlit Cloud app's Secrets settings."
+        )
+        st.stop()
 
 # ---------------- SETUP ----------------
 
