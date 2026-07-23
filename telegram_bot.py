@@ -148,56 +148,56 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     get_or_create_session(user_id)
 
     welcome_message = f"""
-✨ **Welcome to Sparkling Crystal Record Keeper, {user.first_name}!**
+✨ Welcome to Sparkling Crystal Record Keeper, {user.first_name}!
 
 I'm your intelligent dry cleaning shop assistant. I help you manage customer drop-offs through natural conversation.
 
-**What I can do:**
-• 📝 Record customer drop-offs (with confirmation before saving)
-• 💰 Track payments (full/partial/none)
-• 📄 Generate professional PDF receipts
-• 🔍 Search past records
-• 📊 Export all records as CSV
+What I can do:
+• Record customer drop-offs (with confirmation before saving)
+• Track payments (full/partial/none)
+• Generate professional PDF receipts
+• Search past records
+• Export all records as CSV
 
-**Just type naturally, like:**
-• *"Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026"*
-• *"Show me all records for Mrs. Chioma"*
-• *"Resend receipt SC-20260723-001"*
+Just type naturally, like:
+"Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026"
+"Show me all records for Mrs. Chioma"
+"Resend receipt SC-20260723-001"
 
-**Quick Commands:**
-• /records - View recent records
-• /export_csv - Download all records as CSV
-• /help - Show all commands
+Quick Commands:
+/records - View recent records
+/export_csv - Download all records as CSV
+/help - Show all commands
 
 Let's keep your shop organized! 💎
 """
-    await update.message.reply_text(welcome_message, parse_mode='Markdown')
+    await update.message.reply_text(welcome_message)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a help message."""
     help_text = """
-📋 **Available Commands:**
+📋 Available Commands:
 
-• /start - Start the bot and get a welcome message
-• /help - Show this help message
-• /records - List recent records (optionally search by name or invoice)
-• /export_csv - Download all records as a CSV file
+/start - Start the bot and get a welcome message
+/help - Show this help message
+/records - List recent records (optionally search by name or invoice)
+/export_csv - Download all records as a CSV file
 
-**Natural Language Examples:**
+Natural Language Examples:
 
-**Record a Drop-off:**
-*"Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026"*
+Record a Drop-off:
+"Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026"
 
-**Search Records:**
-*"Show me all records for Mrs. Chioma"*
-*"Find invoice SC-20260723-001"*
+Search Records:
+"Show me all records for Mrs. Chioma"
+"Find invoice SC-20260723-001"
 
-**Reprint Receipt:**
-*"Resend receipt SC-20260723-001"*
+Reprint Receipt:
+"Resend receipt SC-20260723-001"
 
 I'll confirm before saving any drop-off - just chat with me! 💬
 """
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text)
 
 async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show recent records or search by name/invoice."""
@@ -229,7 +229,7 @@ async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }.get(r.get("payment_status", ""), "📄")
             
             lines.append(
-                f"{status_emoji} **{r['invoice_number']}** — {r['customer_name']}\n"
+                f"{status_emoji} {r['invoice_number']} — {r['customer_name']}\n"
                 f"   ₦{r['total_amount']:,.0f} total | Balance: ₦{r['balance']:,.0f}\n"
                 f"   📅 Drop-off: {r['dropoff_date']}"
             )
@@ -238,9 +238,9 @@ async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(response) > 4000:
             chunks = [response[i:i+4000] for i in range(0, len(response), 4000)]
             for chunk in chunks:
-                await update.message.reply_text(chunk, parse_mode='Markdown')
+                await update.message.reply_text(chunk)
         else:
-            await update.message.reply_text(response, parse_mode='Markdown')
+            await update.message.reply_text(response)
 
     except Exception as e:
         logger.error(f"Records error: {e}")
