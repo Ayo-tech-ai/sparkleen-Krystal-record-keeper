@@ -62,7 +62,6 @@ def health():
 
 # ---------------- CONFIG ----------------
 
-DATABASE_NAME = "sparkling_crystal.db"
 APP_NAME = "sparkling_crystal_app"
 USER_ID = "telegram_user"
 
@@ -73,7 +72,7 @@ if not TELEGRAM_TOKEN:
 
 # ---------------- INITIALIZE SERVICES ----------------
 
-# Initialize database
+# Initialize database - NO argument needed (uses database.py's own DATABASE_NAME)
 init_db()
 
 # Create agent and runner
@@ -166,9 +165,9 @@ I'm your intelligent dry cleaning shop assistant. I help you manage customer dro
 • *"Resend receipt SC-20260723-001"*
 
 **Quick Commands:**
-/records - View recent records
-/export_csv - Download all records as CSV
-/help - Show all commands
+• /records - View recent records
+• /export_csv - Download all records as CSV
+• /help - Show all commands
 
 Let's keep your shop organized! 💎
 """
@@ -179,22 +178,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 📋 **Available Commands:**
 
-/start - Start the bot and get a welcome message
-/help - Show this help message
-/records - List recent records (optionally search by name or invoice)
-/export_csv - Download all records as a CSV file
+• /start - Start the bot and get a welcome message
+• /help - Show this help message
+• /records - List recent records (optionally search by name or invoice)
+• /export_csv - Download all records as a CSV file
 
 **Natural Language Examples:**
 
 **Record a Drop-off:**
-`Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026`
+*"Mrs. Chioma brought 2 shirts for ₦1000, 3 trousers for ₦1200, paid ₦2000, collect on 25/07/2026"*
 
 **Search Records:**
-`Show me all records for Mrs. Chioma`
-`Find invoice SC-20260723-001`
+*"Show me all records for Mrs. Chioma"*
+*"Find invoice SC-20260723-001"*
 
 **Reprint Receipt:**
-`Resend receipt SC-20260723-001`
+*"Resend receipt SC-20260723-001"*
 
 I'll confirm before saving any drop-off - just chat with me! 💬
 """
