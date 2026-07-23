@@ -1,13 +1,17 @@
 import streamlit as st
 import pandas as pd
 import asyncio
-from datetime import date
 import os
+from datetime import date
 
 from core.database import init_db
 from core.service import record_service
 from core.receipt import generate_receipt
 from agent.agent_setup import create_runner
+
+# ---------------- SETUP ----------------
+
+st.set_page_config(page_title="Sparkleen Krystal Record Keeper", page_icon="🧺", layout="wide")
 
 if "GOOGLE_API_KEY" not in os.environ:
     try:
@@ -18,10 +22,6 @@ if "GOOGLE_API_KEY" not in os.environ:
             "locally, or to your Streamlit Cloud app's Secrets settings."
         )
         st.stop()
-
-# ---------------- SETUP ----------------
-
-st.set_page_config(page_title="Sparkleen Krystal Record Keeper", page_icon="🧺", layout="wide")
 
 init_db()
 
@@ -81,16 +81,22 @@ with tab_form:
                     collection_date=collection_date.isoformat() if collection_date else None,
                 )
                 pdf_path = generate_receipt(result)
+                st.session_state.last_saved_record = result
+                st.session_state.last_receipt_path = pdf_path
 
-                st.success(f"Saved! Invoice: {result['invoice_number']}")
+    # OUTSIDE the form — download button lives here
+    if "last_saved_record" in st.session_state:
+        result = st.session_state.last_saved_record
+        st.success(f"Saved! Invoice: {result['invoice_number']}")
 
-                with open(pdf_path, "rb") as f:
-                    st.download_button(
-                        "📄 Download Receipt",
-                        f,
-                        file_name=f"{result['invoice_number']}.pdf",
-                        mime="application/pdf"
-                    )
+        with open(st.session_state.last_receipt_path, "rb") as f:
+            st.download_button(
+                "📄 Download Receipt",
+                f,
+                file_name=f"{result['invoice_number']}.pdf",
+                mime="application/pdf",
+                key="download_new_receipt"
+            )
 
     st.divider()
     st.subheader("Search Records")
@@ -120,7 +126,11 @@ with tab_form:
                 st.write(f"**Dropoff:** {r['dropoff_date']} | **Collection:** {r.get('collection_date') or 'N/A'}")
                 if st.button("Reprint Receipt", key=f"reprint_{r['invoice_number']}"):
                     pdf_path = generate_receipt(r)
-                    with open(pdf_path, "rb") as f:
+                    st.session_state[f"reprint_path_{r['invoice_number']}"] = pdf_path
+
+                reprint_key = f"reprint_path_{r['invoice_number']}"
+                if reprint_key in st.session_state:
+                    with open(st.session_state[reprint_key], "rb") as f:
                         st.download_button(
                             "📄 Download",
                             f,
