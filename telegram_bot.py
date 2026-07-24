@@ -95,48 +95,6 @@ def get_or_create_session(user_id: str):
         user_sessions[user_id] = session.id
     return user_sessions[user_id]
 
-async def run_agent_turn(session_id: str, message: str) -> str:
-    """Run one turn of the agent and return the response."""
-    try:
-        events = await runner.run_debug(
-            message,
-            user_id=USER_ID,
-            session_id=session_id,
-            quiet=True,
-            verbose=False,
-        )
-
-        if not events:
-            return "No response was generated."
-
-        final_event = events[-1]
-
-        # Check for receipt file in tool responses
-        receipt_path = None
-        for event in events:
-            if hasattr(event, 'get_function_responses'):
-                for fr in event.get_function_responses():
-                    response_data = fr.response
-                    if isinstance(response_data, dict) and response_data.get("receipt_file"):
-                        receipt_path = response_data["receipt_file"]
-
-        if final_event.content and final_event.content.parts:
-            response = " ".join(
-                part.text
-                for part in final_event.content.parts
-                if part.text
-            )
-            return response or "No response was generated."
-
-        return "No response was generated."
-
-    except Exception as e:
-        error_str = str(e).lower()
-        if "resourceexhausted" in error_str or "quota" in error_str or "rate" in error_str:
-            return "I'm a bit busy right now (API limit reached). Please try again shortly."
-        logger.error(f"Agent error: {e}")
-        return f"Something went wrong on my end. Please try that again."
-
 # ---------------- COMMAND HANDLERS ----------------
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -301,10 +259,40 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
     await update.message.chat.send_action(action="typing")
 
     try:
-        # Run the agent
-        response = await run_agent_turn(session_id, user_message)
+        # Run the agent with receipt detection
+        receipt_path = None
+        response = ""
+        
+        events = await runner.run_debug(
+            user_message,
+            user_id=USER_ID,
+            session_id=session_id,
+            quiet=True,
+            verbose=False,
+        )
 
-        # Split long messages (Telegram limit is 4096 characters)
+        if events:
+            final_event = events[-1]
+            
+            # Check for receipt file in tool responses
+            for event in events:
+                if hasattr(event, 'get_function_responses'):
+                    for fr in event.get_function_responses():
+                        response_data = fr.response
+                        if isinstance(response_data, dict) and response_data.get("receipt_file"):
+                            receipt_path = response_data["receipt_file"]
+
+            if final_event.content and final_event.content.parts:
+                response = " ".join(
+                    part.text
+                    for part in final_event.content.parts
+                    if part.text
+                )
+
+        if not response:
+            response = "No response was generated."
+
+        # Send the text response
         if len(response) > 4000:
             chunks = [response[i:i+4000] for i in range(0, len(response), 4000)]
             for chunk in chunks:
@@ -312,8 +300,22 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
         else:
             await update.message.reply_text(response)
 
-        # Check if receipt was generated (handled in run_agent_turn)
-        # The agent will include the receipt file path in the response
+        # Send the PDF if one was generated
+        if receipt_path:
+            try:
+                with open(receipt_path, "rb") as f:
+                    await update.message.reply_document(
+                        document=f,
+                        filename=os.path.basename(receipt_path),
+                        caption="📄 Here's your receipt!"
+                    )
+                logger.info(f"✅ Receipt sent: {receipt_path}")
+            except Exception as e:
+                logger.error(f"Error sending receipt: {e}")
+                await update.message.reply_text(
+                    "⚠️ The receipt was generated but I couldn't send it. "
+                    "Please try again or use /help for assistance."
+                )
 
     except Exception as e:
         logger.error(f"Error processing message: {e}")
