@@ -26,7 +26,7 @@ record_keeper_toolset = SkillToolset(
 
 record_keeper_agent = Agent(
 
-    model="gemini-3.6-flash",
+    model="gemini-3.7-flash",
 
     name="sparkling_crystal_record_keeper",
 
