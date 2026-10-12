@@ -207,9 +207,8 @@ async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"   📅 Drop-off: {r['dropoff_date']}"
             )
 
-        response = "
+        response = "\n\n".join(lines)
 
-".join(lines)
         if len(response) > 4000:
             chunks = [response[i:i+4000] for i in range(0, len(response), 4000)]
             for chunk in chunks:
