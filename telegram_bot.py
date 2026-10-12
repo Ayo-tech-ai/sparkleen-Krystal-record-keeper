@@ -202,10 +202,8 @@ async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }.get(r.get("payment_status", ""), "📄")
 
             lines.append(
-                f"{status_emoji} {r['invoice_number']} — {r['customer_name']}
-"
-                f"   ₦{r['total_amount']:,.0f} total | Balance: ₦{r['balance']:,.0f}
-"
+                f"{status_emoji} {r['invoice_number']} — {r['customer_name']}"
+                f"   ₦{r['total_amount']:,.0f} total | Balance: ₦{r['balance']:,.0f}"
                 f"   📅 Drop-off: {r['dropoff_date']}"
             )
 
