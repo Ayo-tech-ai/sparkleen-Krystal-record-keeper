@@ -1,6 +1,9 @@
 """
 Telegram Bot for Sparkling Crystal Dry Cleaning Record Keeper
 Full agent integration - runs as a web service on Render
+
+Sessions and records are persisted in Supabase Postgres, so nothing
+is lost when the Render free tier container spins down.
 """
 
 import os
@@ -72,28 +75,40 @@ if not TELEGRAM_TOKEN:
 
 # ---------------- INITIALIZE SERVICES ----------------
 
-# Initialize database - NO argument needed (uses database.py's own DATABASE_NAME)
+# Initialize database - creates dropoff_records table in Supabase if needed
 init_db()
 
-# Create agent and runner
-from agent.agent_setup import create_runner
+# Create agent and runner (session state persisted in Supabase Postgres)
 runner, session_service = create_runner(app_name=APP_NAME)
 
 # ---------------- SESSION MANAGEMENT ----------------
 
-# Store user sessions (in-memory, consider Redis for production)
-user_sessions = {}
+# NOTE: No in-memory user_sessions dict anymore. Session IDs are
+# deterministic (tg_<user_id>) and the session STATE itself is stored
+# in Postgres by DatabaseSessionService — so a container restart loses
+# nothing.
 
-def get_or_create_session(user_id: str):
-    """Get or create a session for a Telegram user."""
-    if user_id not in user_sessions:
-        # Use sync method for simplicity
-        session = session_service.create_session_sync(
+def get_or_create_session_id(user_id: str) -> str:
+    """Returns a deterministic session id for this Telegram user.
+
+    The session (conversation state/memory) is loaded from Supabase if
+    it exists, or created fresh. Safe to call on every message.
+    """
+    session_id = f"tg_{user_id}"
+    try:
+        session_service.get_session_sync(
             app_name=APP_NAME,
-            user_id=user_id,
+            user_id=USER_ID,
+            session_id=session_id,
         )
-        user_sessions[user_id] = session.id
-    return user_sessions[user_id]
+    except Exception:
+        # Session doesn't exist yet in the database — create it
+        session_service.create_session_sync(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            session_id=session_id,
+        )
+    return session_id
 
 # ---------------- COMMAND HANDLERS ----------------
 
@@ -102,8 +117,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = str(user.id)
 
-    # Initialize session for this user
-    get_or_create_session(user_id)
+    # Initialize session for this user (persisted in Supabase)
+    get_or_create_session_id(user_id)
 
     welcome_message = f"""
 ✨ Welcome to Sparkling Crystal Record Keeper, {user.first_name}!
@@ -185,14 +200,18 @@ async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "partial": "⚠️",
                 "none": "❌"
             }.get(r.get("payment_status", ""), "📄")
-            
+
             lines.append(
-                f"{status_emoji} {r['invoice_number']} — {r['customer_name']}\n"
-                f"   ₦{r['total_amount']:,.0f} total | Balance: ₦{r['balance']:,.0f}\n"
+                f"{status_emoji} {r['invoice_number']} — {r['customer_name']}
+"
+                f"   ₦{r['total_amount']:,.0f} total | Balance: ₦{r['balance']:,.0f}
+"
                 f"   📅 Drop-off: {r['dropoff_date']}"
             )
 
-        response = "\n\n".join(lines)
+        response = "
+
+".join(lines)
         if len(response) > 4000:
             chunks = [response[i:i+4000] for i in range(0, len(response), 4000)]
             for chunk in chunks:
@@ -252,8 +271,8 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
     user_message = update.message.text
     user_id = str(update.effective_user.id)
 
-    # Get or create session for this user
-    session_id = get_or_create_session(user_id)
+    # Get or create session for this user (state persists in Supabase)
+    session_id = get_or_create_session_id(user_id)
 
     # Show typing indicator
     await update.message.chat.send_action(action="typing")
@@ -262,7 +281,7 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
         # Run the agent with receipt detection
         receipt_path = None
         response = ""
-        
+
         events = await runner.run_debug(
             user_message,
             user_id=USER_ID,
@@ -273,7 +292,7 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
 
         if events:
             final_event = events[-1]
-            
+
             # Check for receipt file in tool responses
             for event in events:
                 if hasattr(event, 'get_function_responses'):
@@ -320,7 +339,9 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         await update.message.reply_text(
-            f"⚠️ I encountered an error: {str(e)}\n\n"
+            f"⚠️ I encountered an error: {str(e)}
+
+"
             "Please try again or use /help for available commands."
         )
 
