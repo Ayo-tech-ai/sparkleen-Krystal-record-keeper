@@ -18,14 +18,13 @@ def generate_invoice_number():
     """Generates the next invoice number for today in SC-YYYYMMDD-NNN format."""
     date_part = datetime.now(WAT).strftime("%Y%m%d")
 
-    connection = get_connection()
-    cursor = connection.cursor()
-    cursor.execute(
-        "SELECT COUNT(*) FROM dropoff_records WHERE invoice_number LIKE ?",
-        (f"SC-{date_part}-%",)
-    )
-    count_today = cursor.fetchone()[0]
-    connection.close()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS count FROM dropoff_records WHERE invoice_number LIKE %s",
+                (f"SC-{date_part}-%",)
+            )
+            count_today = cursor.fetchone()["count"]
 
     next_seq = count_today + 1
     return f"SC-{date_part}-{next_seq:03d}"
