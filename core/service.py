@@ -1,5 +1,4 @@
 import json
-import sqlite3
 from core.database import get_connection
 from core.helpers import now_wat_str, today_wat_date, generate_invoice_number
 
@@ -28,24 +27,21 @@ class RecordKeeperService:
         invoice_number = generate_invoice_number()
         dropoff_date = today_wat_date()
 
-        connection = get_connection()
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            INSERT INTO dropoff_records
-            (invoice_number, customer_name, items, total_units, total_amount,
-             payment_status, amount_paid, balance, service_type,
-             dropoff_date, collection_date, late_fee_applied, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (invoice_number, customer_name, json.dumps(items), total_units,
-             total_amount, payment_status, amount_paid, max(balance, 0),
-             service_type, dropoff_date, collection_date,
-             False, now_wat_str())
-        )
-        connection.commit()
-        connection.close()
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO dropoff_records
+                    (invoice_number, customer_name, items, total_units, total_amount,
+                     payment_status, amount_paid, balance, service_type,
+                     dropoff_date, collection_date, late_fee_applied, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (invoice_number, customer_name, json.dumps(items), total_units,
+                     total_amount, payment_status, amount_paid, max(balance, 0),
+                     service_type, dropoff_date, collection_date,
+                     False, now_wat_str())
+                )
 
         return {
             "success": True,
@@ -66,59 +62,53 @@ class RecordKeeperService:
 
     def search_records(self, customer_name=None, invoice_number=None,
                         dropoff_date=None, payment_status=None):
-        connection = get_connection()
-        connection.row_factory = sqlite3.Row
-        cursor = connection.cursor()
-
         query = "SELECT * FROM dropoff_records WHERE 1=1"
         params = []
 
         if customer_name:
-            query += " AND LOWER(customer_name) LIKE LOWER(?)"
+            query += " AND LOWER(customer_name) LIKE LOWER(%s)"
             params.append(f"%{customer_name}%")
 
         if invoice_number:
-            query += " AND invoice_number = ?"
+            query += " AND invoice_number = %s"
             params.append(invoice_number)
 
         if dropoff_date:
-            query += " AND dropoff_date = ?"
+            query += " AND dropoff_date = %s"
             params.append(dropoff_date)
 
         if payment_status:
-            query += " AND payment_status = ?"
+            query += " AND payment_status = %s"
             params.append(payment_status)
 
         query += " ORDER BY created_at DESC"
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        connection.close()
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
 
         results = []
-        for row in rows:
-            record = dict(row)
+        for record in rows:
+            record = dict(record)
             record["items"] = json.loads(record["items"])
             results.append(record)
 
         return results
 
     def get_record_by_invoice(self, invoice_number):
-        connection = get_connection()
-        connection.row_factory = sqlite3.Row
-        cursor = connection.cursor()
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT * FROM dropoff_records WHERE invoice_number = %s",
+                    (invoice_number,)
+                )
+                record = cursor.fetchone()
 
-        cursor.execute(
-            "SELECT * FROM dropoff_records WHERE invoice_number = ?",
-            (invoice_number,)
-        )
-        row = cursor.fetchone()
-        connection.close()
-
-        if not row:
+        if not record:
             return None
 
-        record = dict(row)
+        record = dict(record)
         record["items"] = json.loads(record["items"])
         return record
 
