@@ -336,9 +336,7 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         await update.message.reply_text(
-            f"⚠️ I encountered an error: {str(e)}
-
-"
+            f"⚠️ I encountered an error: {str(e)}\n\n"
             "Please try again or use /help for available commands."
         )
 
