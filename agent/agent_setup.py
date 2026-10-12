@@ -1,9 +1,11 @@
+import os
+from datetime import date
+
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from datetime import date
+from google.adk.sessions import DatabaseSessionService
 
 from agent.tools import record_dropoff, search_records, get_receipt_for_invoice
 from agent.skills import record_keeper_core_skill, record_keeper_operations_skill
@@ -85,11 +87,35 @@ Maintain a professional, efficient tone — accurate above all else.
 )
 
 
+def _session_db_url() -> str:
+    """Builds the SQLAlchemy URL ADK's DatabaseSessionService needs.
+
+    Falls back to SUPABASE_DB_URL so you only need ONE env var.
+    The +psycopg driver prefix is required by SQLAlchemy.
+    Keepalive params stop Supabase's pooler dropping idle connections.
+    """
+    url = os.environ.get("ADK_SESSION_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    if not url:
+        raise RuntimeError(
+            "SUPABASE_DB_URL (or ADK_SESSION_DB_URL) is not set. "
+            "Agent session memory needs a database to survive restarts."
+        )
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            url = "postgresql+psycopg://" + url[len(prefix):]
+            break
+    sep = "&" if "?" in url else "?"
+    url += f"{sep}keepalives=1&keepalives_idle=60&keepalives_interval=30&keepalives_count=5"
+    return url
+
+
 def create_runner(app_name="sparkling_crystal_app"):
-    """Creates a fresh session service + runner pair. Streamlit will
-    call this once per user session (st.session_state), Telegram will
-    call it per chat_id later."""
-    session_service = InMemorySessionService()
+    """Creates a runner backed by Supabase Postgres for session state.
+
+    Session memory now survives Render restarts/spin-downs because it is
+    persisted in the database, not in process memory.
+    """
+    session_service = DatabaseSessionService(db_url=_session_db_url())
     runner = Runner(
         app_name=app_name,
         agent=record_keeper_agent,
