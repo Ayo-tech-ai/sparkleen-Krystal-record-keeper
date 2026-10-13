@@ -83,12 +83,9 @@ runner, session_service = create_runner(app_name=APP_NAME)
 
 # ---------------- SESSION MANAGEMENT ----------------
 
-# NOTE: No in-memory user_sessions dict anymore. Session IDs are
-# deterministic (tg_<user_id>) and the session STATE itself is stored
-# in Postgres by DatabaseSessionService — so a container restart loses
-# nothing.
+# ---------------- SESSION MANAGEMENT ----------------
 
-def get_or_create_session_id(user_id: str) -> str:
+async def get_or_create_session_id(user_id: str) -> str:
     """Returns a deterministic session id for this Telegram user.
 
     The session (conversation state/memory) is loaded from Supabase if
@@ -96,19 +93,20 @@ def get_or_create_session_id(user_id: str) -> str:
     """
     session_id = f"tg_{user_id}"
     try:
-        session_service.get_session_sync(
+        await session_service.get_session(
             app_name=APP_NAME,
             user_id=USER_ID,
             session_id=session_id,
         )
     except Exception:
         # Session doesn't exist yet in the database — create it
-        session_service.create_session_sync(
+        await session_service.create_session(
             app_name=APP_NAME,
             user_id=USER_ID,
             session_id=session_id,
         )
     return session_id
+    
 
 # ---------------- COMMAND HANDLERS ----------------
 
@@ -118,7 +116,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(user.id)
 
     # Initialize session for this user (persisted in Supabase)
-    get_or_create_session_id(user_id)
+    await get_or_create_session_id(user_id)
 
     welcome_message = f"""
 ✨ Welcome to Sparkling Crystal Record Keeper, {user.first_name}!
@@ -269,7 +267,7 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
     user_id = str(update.effective_user.id)
 
     # Get or create session for this user (state persists in Supabase)
-    session_id = get_or_create_session_id(user_id)
+    session_id = await get_or_create_session_id(user_id)
 
     # Show typing indicator
     await update.message.chat.send_action(action="typing")
