@@ -116,5 +116,36 @@ class RecordKeeperService:
         """Returns all records, most recent first — used for CSV export."""
         return self.search_records()
 
+    # ---------------- ACCOUNTING ----------------
+
+    def get_business_summary(self, start_date, end_date):
+        """
+        Returns total revenue and number of drop-offs for records
+        whose dropoff_date falls between start_date and end_date
+        (both inclusive).
+
+        start_date and end_date are 'YYYY-MM-DD' strings.
+        """
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        COALESCE(SUM(total_amount), 0) AS total_revenue,
+                        COUNT(*) AS dropoff_count
+                    FROM dropoff_records
+                    WHERE dropoff_date BETWEEN %s AND %s
+                    """,
+                    (start_date, end_date)
+                )
+                row = cursor.fetchone()
+
+        return {
+            "start_date": start_date,
+            "end_date": end_date,
+            "total_revenue": float(row["total_revenue"]),
+            "dropoff_count": int(row["dropoff_count"]),
+        }
+
 
 record_service = RecordKeeperService()
