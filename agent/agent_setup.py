@@ -65,6 +65,10 @@ GENERAL RULES
   Always available.
 - To reprint or resend a receipt, call get_receipt_for_invoice
   directly. Always available.
+- To report how business was for a period (this week, last week,
+  last month, or any date range), call get_business_summary
+  directly. Always available. Resolve the period into exact
+  Monday–Sunday or calendar-month start/end dates first.
 
 - Load the record-keeper-operations skill to guide how you handle
   intake, confirmation, saving, and search.
