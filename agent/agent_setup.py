@@ -7,7 +7,7 @@ from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
-from agent.tools import record_dropoff, search_records, get_receipt_for_invoice
+from agent.tools import record_dropoff, search_records, get_receipt_for_invoice, get_business_summary
 from agent.skills import record_keeper_core_skill, record_keeper_operations_skill
 
 today_str = date.today().isoformat()
@@ -16,6 +16,7 @@ today_str = date.today().isoformat()
 record_dropoff_tool = FunctionTool(record_dropoff)
 search_records_tool = FunctionTool(search_records)
 get_receipt_for_invoice_tool = FunctionTool(get_receipt_for_invoice)
+get_business_summary_tool = FunctionTool(get_business_summary)
 
 # Bundle skills into a toolset
 record_keeper_toolset = SkillToolset(
@@ -82,6 +83,7 @@ Maintain a professional, efficient tone — accurate above all else.
         record_dropoff_tool,
         search_records_tool,
         get_receipt_for_invoice_tool,
+        get_business_summary_tool,
         record_keeper_toolset,
     ]
 )
