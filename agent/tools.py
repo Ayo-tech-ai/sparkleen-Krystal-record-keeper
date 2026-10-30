@@ -89,3 +89,24 @@ def get_receipt_for_invoice(invoice_number: str):
 
     pdf_path = generate_receipt(record)
     return {"success": True, "invoice_number": invoice_number, "receipt_file": pdf_path}
+
+
+def get_business_summary(start_date: str, end_date: str):
+    """
+    Get total revenue and number of drop-offs for a period.
+
+    Use this when the owner asks how business was for a period —
+    e.g. "this week", "last week", "last month", or any date range.
+
+    IMPORTANT: Resolve the period into exact start and end dates
+    BEFORE calling this tool. Weeks run Monday to Sunday. Months
+    are calendar months. Both dates are inclusive.
+
+    Args:
+        start_date: First day of the period, exact YYYY-MM-DD.
+        end_date: Last day of the period, exact YYYY-MM-DD.
+    """
+    return record_service.get_business_summary(
+        start_date=start_date,
+        end_date=end_date,
+    )
