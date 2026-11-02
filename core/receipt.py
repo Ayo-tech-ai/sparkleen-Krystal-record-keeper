@@ -59,9 +59,9 @@ def generate_receipt(record, late_fee_percent=0.15):
     # ----- RECEIPT TITLE -----
     pdf.ln(1)
     pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 5, "RECEIPT", ln=True, align="C")
+    pdf.cell(0, 5, "DROP-OFF RECEIPT", ln=True, align="C")
     pdf.ln(0.5)
-    pdf.set_draw_color(180, 180, 180)
+    pdf.set_draw_color(0, 0, 180)
     pdf.line(3, pdf.get_y(), 102, pdf.get_y())
     pdf.ln(1)
 
