@@ -6,6 +6,7 @@ from datetime import date
 
 from core.database import init_db
 from core.service import record_service
+from core.key_rotation import GoogleKeyRotator, KeyRotationExhausted
 from agent.agent_setup import create_runner
 
 # ---------------- SETUP ----------------
@@ -211,16 +212,30 @@ st.markdown(
 
 # Load secrets from Streamlit secrets.toml / Cloud Secrets into os.environ
 # BEFORE core modules read them (core.database reads SUPABASE_DB_URL at import).
-for key in ("GOOGLE_API_KEY", "SUPABASE_DB_URL"):
+# Load keys first; a missing optional key shouldn't stop the app.
+for key in ("GOOGLE_API_KEY", "GOOGLE_API_KEY_1", "GOOGLE_API_KEY_2", "SUPABASE_DB_URL"):
     if key not in os.environ:
         try:
             os.environ[key] = st.secrets[key]
         except Exception:
-            st.error(
-                f"{key} not found. Add it to .streamlit/secrets.toml "
-                "locally, or to your Streamlit Cloud app's Secrets settings."
-            )
-            st.stop()
+            pass  # Validated explicitly below
+
+# Validate required keys
+if not (os.environ.get("GOOGLE_API_KEY_1")
+        or os.environ.get("GOOGLE_API_KEY_2")
+        or os.environ.get("GOOGLE_API_KEY")):
+    st.error(
+        "No Google API key found. Add GOOGLE_API_KEY_1 and/or "
+        "GOOGLE_API_KEY_2 to Streamlit secrets."
+    )
+    st.stop()
+
+if not os.environ.get("SUPABASE_DB_URL"):
+    st.error(
+        "SUPABASE_DB_URL not found. Add it to .streamlit/secrets.toml "
+        "locally, or to your Streamlit Cloud app's Secrets settings."
+    )
+    st.stop()
 
 init_db()
 
@@ -246,6 +261,14 @@ async def _get_or_create_web_session(session_service):
 
 
 if "runner" not in st.session_state:
+    # Build the key rotator FIRST, so its active key is written to
+    # os.environ["GOOGLE_API_KEY"] before the agent is used.
+    if "key_rotator" not in st.session_state:
+        st.session_state.key_rotator = GoogleKeyRotator(
+            os.environ.get("GOOGLE_API_KEY_1"),
+            os.environ.get("GOOGLE_API_KEY_2"),
+        )
+
     runner, session_service = create_runner()
     st.session_state.runner = runner
     # DatabaseSessionService exposes async APIs — run via asyncio.run
@@ -347,13 +370,16 @@ if user_input:
         st.markdown(user_input)
 
     async def get_response():
-        events = await st.session_state.runner.run_debug(
-            user_input,
-            user_id=WEB_USER_ID,
-            session_id=WEB_SESSION_ID,
-            quiet=True,
-            verbose=False,
-        )
+        async def _do_call():
+            return await st.session_state.runner.run_debug(
+                user_input,
+                user_id=WEB_USER_ID,
+                session_id=WEB_SESSION_ID,
+                quiet=True,
+                verbose=False,
+            )
+
+        events = await st.session_state.key_rotator.call_with_failover(_do_call)
         final_event = events[-1]
 
         receipt_path = None
@@ -375,6 +401,12 @@ if user_input:
         with st.spinner("Thinking..."):
             try:
                 response_text, receipt_path = asyncio.run(get_response())
+            except KeyRotationExhausted:
+                response_text = (
+                    "⚠️ Both Google API keys have hit their daily free-tier limit. "
+                    "This resets at midnight Pacific Time — try again after that."
+                )
+                receipt_path = None
             except Exception as e:
                 error_str = str(e).lower()
                 if "resourceexhausted" in error_str or "quota" in error_str or "rate" in error_str:
