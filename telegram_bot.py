@@ -25,6 +25,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Import your existing modules
 from core.database import init_db
 from core.service import record_service
+from core.key_rotation import GoogleKeyRotator, KeyRotationExhausted
 from agent.agent_setup import create_runner
 
 # Setup logging
@@ -73,6 +74,20 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN environment variable not set!")
 
+GOOGLE_API_KEY_1 = os.environ.get("GOOGLE_API_KEY_1")
+GOOGLE_API_KEY_2 = os.environ.get("GOOGLE_API_KEY_2")
+
+if not GOOGLE_API_KEY_1 and not GOOGLE_API_KEY_2:
+    raise ValueError(
+        "At least one Google API key must be set "
+        "(GOOGLE_API_KEY_1 or GOOGLE_API_KEY_2)!"
+    )
+
+# ---------------- KEY ROTATOR ----------------
+
+key_rotator = GoogleKeyRotator(GOOGLE_API_KEY_1, GOOGLE_API_KEY_2)
+logger.info(f"Google key rotator active: {key_rotator.current_key_label()}")
+
 # ---------------- INITIALIZE SERVICES ----------------
 
 # Initialize database - creates dropoff_records table in Supabase if needed
@@ -80,8 +95,6 @@ init_db()
 
 # Create agent and runner (session state persisted in Supabase Postgres)
 runner, session_service = create_runner(app_name=APP_NAME)
-
-# ---------------- SESSION MANAGEMENT ----------------
 
 # ---------------- SESSION MANAGEMENT ----------------
 
@@ -106,7 +119,7 @@ async def get_or_create_session_id(user_id: str) -> str:
             session_id=session_id,
         )
     return session_id
-    
+
 
 # ---------------- COMMAND HANDLERS ----------------
 
@@ -277,13 +290,23 @@ async def natural_language_handler(update: Update, context: ContextTypes.DEFAULT
         receipt_path = None
         response = ""
 
-        events = await runner.run_debug(
-            user_message,
-            user_id=USER_ID,
-            session_id=session_id,
-            quiet=True,
-            verbose=False,
-        )
+        async def _do_call():
+            return await runner.run_debug(
+                user_message,
+                user_id=USER_ID,
+                session_id=session_id,
+                quiet=True,
+                verbose=False,
+            )
+
+        try:
+            events = await key_rotator.call_with_failover(_do_call)
+        except KeyRotationExhausted:
+            await update.message.reply_text(
+                "⚠️ Both Google API keys have hit their daily free-tier limit. "
+                "This resets at midnight Pacific Time — try again after that."
+            )
+            return
 
         if events:
             final_event = events[-1]
