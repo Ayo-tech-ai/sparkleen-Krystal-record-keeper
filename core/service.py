@@ -1,6 +1,24 @@
 import json
+from datetime import date, datetime
 from core.database import get_connection
 from core.helpers import now_wat_str, today_wat_date, generate_invoice_number
+
+
+def _serialize_record(record):
+    """Converts date/datetime fields to ISO strings so results are
+    JSON-safe. Leaves None alone and passes strings through unchanged.
+
+    Touches only the two date columns the dropoff_records table has.
+    """
+    if not record:
+        return record
+
+    for field in ("dropoff_date", "collection_date"):
+        value = record.get(field)
+        if isinstance(value, (date, datetime)):
+            record[field] = value.isoformat()
+        # None and str are left as-is
+    return record
 
 
 class RecordKeeperService:
@@ -43,7 +61,7 @@ class RecordKeeperService:
                      False, now_wat_str())
                 )
 
-        return {
+        return _serialize_record({
             "success": True,
             "invoice_number": invoice_number,
             "customer_name": customer_name,
@@ -56,7 +74,7 @@ class RecordKeeperService:
             "service_type": service_type,
             "dropoff_date": dropoff_date,
             "collection_date": collection_date,
-        }
+        })
 
     # ---------------- SEARCH ----------------
 
@@ -92,7 +110,7 @@ class RecordKeeperService:
         for record in rows:
             record = dict(record)
             record["items"] = json.loads(record["items"])
-            results.append(record)
+            results.append(_serialize_record(record))
 
         return results
 
@@ -110,7 +128,7 @@ class RecordKeeperService:
 
         record = dict(record)
         record["items"] = json.loads(record["items"])
-        return record
+        return _serialize_record(record)
 
     def get_all_records(self):
         """Returns all records, most recent first — used for CSV export."""
