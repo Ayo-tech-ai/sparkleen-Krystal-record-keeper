@@ -110,3 +110,59 @@ def get_business_summary(start_date: str, end_date: str):
         start_date=start_date,
         end_date=end_date,
     )
+
+
+def record_payment(
+    invoice_number: str,
+    amount: float,
+    method: Optional[str] = None,
+    paid_on: Optional[str] = None,
+):
+    """
+    Record a payment against an existing invoice.
+
+    IMPORTANT: Only call this after the owner has explicitly
+    confirmed the payment summary you presented. Never call this
+    on the first mention of a payment — always show a summary
+    first and wait for confirmation.
+
+    IMPORTANT: The invoice_number must be an exact existing
+    invoice number (e.g. "SC-20261103-001"). If the owner didn't
+    provide one, use search_records first to find the right
+    invoice. If multiple open invoices exist for the customer,
+    ask the owner which one — never guess.
+
+    Rejects overpayments: amount cannot exceed the invoice's
+    current balance.
+
+    Args:
+        invoice_number: Exact invoice number, e.g. "SC-20261103-001".
+        amount: Amount being paid now (this payment only, not the
+            running total). Must be greater than zero and no more
+            than the current balance.
+        method: Optional payment method, e.g. "cash", "transfer".
+        paid_on: Optional "YYYY-MM-DD" date the payment was made.
+            Defaults to today if not given.
+    """
+    return record_service.record_payment(
+        invoice_number=invoice_number,
+        amount=amount,
+        method=method,
+        paid_on=paid_on,
+    )
+
+
+def get_payments_for_invoice(invoice_number: str):
+    """
+    Return all payments recorded against a single invoice, oldest
+    first. Use this when the owner asks for the payment history of
+    an invoice, how much has been paid so far, or how many times
+    a customer has paid.
+
+    Returns an empty list if no payments exist yet — that is not
+    an error, it just means nothing has been paid on that invoice.
+
+    Args:
+        invoice_number: Exact invoice number, e.g. "SC-20261103-001".
+    """
+    return record_service.get_payments_for_invoice(invoice_number)
