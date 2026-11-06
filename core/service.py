@@ -3,7 +3,6 @@
 #from core.database import get_connection
 #from core.helpers import now_wat_str, today_wat_date, generate_invoice_number
 
-
 import json
 from datetime import date, datetime
 from core.database import get_connection
@@ -13,6 +12,7 @@ from core.helpers import (
     generate_invoice_number,
     generate_payment_receipt_number,
 )
+from core.payment_receipt import generate_payment_receipt
 
 
 def _serialize_record(record):
@@ -198,6 +198,7 @@ class RecordKeeperService:
           message: reason if success is False
           payment: the inserted payment row (if success)
           invoice: the updated invoice snapshot (if success)
+          receipt_file: path to the generated payment receipt PDF
         """
         invoice = self.get_record_by_invoice(invoice_number)
         if not invoice:
@@ -286,10 +287,19 @@ class RecordKeeperService:
         }
         updated_invoice = self.get_record_by_invoice(invoice_number)
 
+        # 5. Generate the payment receipt PDF (mirrors record_dropoff)
+        history = self.get_payments_for_invoice(invoice_number)
+        receipt_path = generate_payment_receipt(
+            payment=payment_row,
+            invoice=updated_invoice,
+            history=history,
+        )
+
         return {
             "success": True,
             "payment": payment_row,
             "invoice": updated_invoice,
+            "receipt_file": receipt_path,
         }
 
     def get_payments_for_invoice(self, invoice_number):
