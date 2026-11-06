@@ -7,7 +7,7 @@ from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
-from agent.tools import record_dropoff, search_records, get_receipt_for_invoice, get_business_summary, record_payment, get_payments_for_invoice
+from agent.tools import record_dropoff, search_records, get_receipt_for_invoice, get_business_summary, record_payment, get_payments_for_invoice, get_outstanding_balances
 from agent.skills import record_keeper_core_skill, record_keeper_operations_skill
 
 today_str = date.today().isoformat()
@@ -19,6 +19,7 @@ get_receipt_for_invoice_tool = FunctionTool(get_receipt_for_invoice)
 get_business_summary_tool = FunctionTool(get_business_summary)
 record_payment_tool = FunctionTool(record_payment)
 get_payments_for_invoice_tool = FunctionTool(get_payments_for_invoice)
+get_outstanding_balances_tool = FunctionTool(get_outstanding_balances)
 
 # Bundle skills into a toolset
 record_keeper_toolset = SkillToolset(
@@ -80,6 +81,11 @@ GENERAL RULES
 - To look up payment history for an invoice (or how much has
   been paid so far), call get_payments_for_invoice directly.
   Always available.
+- To report who owes money, how much a specific customer owes, or
+  the total outstanding across the business, call
+  get_outstanding_balances directly. Always available. Never
+  guess — if no customer name is given, return every customer
+  with a balance.
 
 - Load the record-keeper-operations skill to guide how you handle
   intake, confirmation, saving, and search.
@@ -101,6 +107,7 @@ Maintain a professional, efficient tone — accurate above all else.
         get_business_summary_tool,
         record_payment_tool,
         get_payments_for_invoice_tool,
+        get_outstanding_balances_tool,
         record_keeper_toolset,
     ]
 )
