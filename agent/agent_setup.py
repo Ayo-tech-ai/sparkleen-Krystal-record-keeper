@@ -7,7 +7,7 @@ from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
-from agent.tools import record_dropoff, search_records, get_receipt_for_invoice, get_business_summary
+from agent.tools import record_dropoff, search_records, get_receipt_for_invoice, get_business_summary, record_payment, get_payments_for_invoice
 from agent.skills import record_keeper_core_skill, record_keeper_operations_skill
 
 today_str = date.today().isoformat()
@@ -17,6 +17,8 @@ record_dropoff_tool = FunctionTool(record_dropoff)
 search_records_tool = FunctionTool(search_records)
 get_receipt_for_invoice_tool = FunctionTool(get_receipt_for_invoice)
 get_business_summary_tool = FunctionTool(get_business_summary)
+record_payment_tool = FunctionTool(record_payment)
+get_payments_for_invoice_tool = FunctionTool(get_payments_for_invoice)
 
 # Bundle skills into a toolset
 record_keeper_toolset = SkillToolset(
@@ -68,7 +70,16 @@ GENERAL RULES
 - To report how business was for a period (this week, last week,
   last month, or any date range), call get_business_summary
   directly. Always available. Resolve the period into exact
-  Monday–Sunday or calendar-month start/end dates first.
+  Monday–Sunday or calendar-month start/end dates first
+- To record a confirmed payment against an invoice, call
+  record_payment directly. Always available. NEVER call this
+  before the owner has explicitly confirmed the payment
+  summary. If no invoice number is given, use search_records
+  first to find the right invoice — and if multiple open
+  invoices exist for the customer, ask which one.
+- To look up payment history for an invoice (or how much has
+  been paid so far), call get_payments_for_invoice directly.
+  Always available.
 
 - Load the record-keeper-operations skill to guide how you handle
   intake, confirmation, saving, and search.
@@ -88,6 +99,8 @@ Maintain a professional, efficient tone — accurate above all else.
         search_records_tool,
         get_receipt_for_invoice_tool,
         get_business_summary_tool,
+        record_payment_tool,
+        get_payments_for_invoice_tool,
         record_keeper_toolset,
     ]
 )
