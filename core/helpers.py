@@ -29,6 +29,7 @@ def generate_invoice_number():
     next_seq = count_today + 1
     return f"SC-{date_part}-{next_seq:03d}"
 
+
 def generate_payment_receipt_number():
     """Generates the next payment receipt number for today in
     PAY-YYYYMMDD-NNN format."""
