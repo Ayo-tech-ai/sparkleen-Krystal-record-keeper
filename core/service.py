@@ -1,7 +1,18 @@
+#import json
+#from datetime import date, datetime
+#from core.database import get_connection
+#from core.helpers import now_wat_str, today_wat_date, generate_invoice_number
+
+
 import json
 from datetime import date, datetime
 from core.database import get_connection
-from core.helpers import now_wat_str, today_wat_date, generate_invoice_number
+from core.helpers import (
+    now_wat_str,
+    today_wat_date,
+    generate_invoice_number,
+    generate_payment_receipt_number,
+)
 
 
 def _serialize_record(record):
@@ -164,6 +175,150 @@ class RecordKeeperService:
             "total_revenue": float(row["total_revenue"]),
             "dropoff_count": int(row["dropoff_count"]),
         }
+
+    # ---------------- PAYMENTS ----------------
+
+    def record_payment(self, invoice_number, amount,
+                        method=None, paid_on=None):
+        """
+        Records a payment against an existing invoice.
+
+        - invoice_number: the invoice this payment is for.
+        - amount: this payment only (not the running total).
+        - method: optional ("cash", "transfer", etc.).
+        - paid_on: optional "YYYY-MM-DD"; defaults to today (WAT).
+
+        Rejects overpayments — amount cannot exceed the invoice's
+        current balance. Recomputes the invoice's amount_paid and
+        balance from the full payments ledger after inserting, so
+        the cached values on dropoff_records are always correct.
+
+        Returns a dict with:
+          success: True/False
+          message: reason if success is False
+          payment: the inserted payment row (if success)
+          invoice: the updated invoice snapshot (if success)
+        """
+        invoice = self.get_record_by_invoice(invoice_number)
+        if not invoice:
+            return {
+                "success": False,
+                "message": f"No invoice found for {invoice_number}.",
+            }
+
+        current_balance = float(invoice["balance"] or 0)
+        amount = float(amount)
+
+        if amount <= 0:
+            return {
+                "success": False,
+                "message": "Payment amount must be greater than zero.",
+            }
+
+        if amount > current_balance:
+            return {
+                "success": False,
+                "message": (
+                    f"Payment of ₦{amount:,.0f} exceeds the outstanding "
+                    f"balance of ₦{current_balance:,.0f} on invoice "
+                    f"{invoice_number}."
+                ),
+            }
+
+        paid_on = paid_on or today_wat_date()
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                # 1. Insert the payment row
+                payment_receipt_number = generate_payment_receipt_number()
+                cursor.execute(
+                    """
+                    INSERT INTO payments
+                    (payment_receipt_number, invoice_number, customer_name,
+                     amount, paid_on, method)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (payment_receipt_number, invoice_number,
+                     invoice["customer_name"], amount, paid_on, method)
+                )
+
+                # 2. Recompute totals from the ledger
+                cursor.execute(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total_paid
+                    FROM payments
+                    WHERE invoice_number = %s
+                    """,
+                    (invoice_number,)
+                )
+                total_paid = float(cursor.fetchone()["total_paid"])
+
+                total_amount = float(invoice["total_amount"])
+                new_balance = max(total_amount - total_paid, 0)
+
+                if new_balance <= 0:
+                    new_status = "full"
+                elif total_paid > 0:
+                    new_status = "partial"
+                else:
+                    new_status = "none"
+
+                # 3. Update the invoice's cached values
+                cursor.execute(
+                    """
+                    UPDATE dropoff_records
+                    SET amount_paid = %s,
+                        balance = %s,
+                        payment_status = %s
+                    WHERE invoice_number = %s
+                    """,
+                    (total_paid, new_balance, new_status, invoice_number)
+                )
+
+        # 4. Build the return payload from fresh state
+        payment_row = {
+            "payment_receipt_number": payment_receipt_number,
+            "invoice_number": invoice_number,
+            "customer_name": invoice["customer_name"],
+            "amount": amount,
+            "paid_on": paid_on,
+            "method": method,
+        }
+        updated_invoice = self.get_record_by_invoice(invoice_number)
+
+        return {
+            "success": True,
+            "payment": payment_row,
+            "invoice": updated_invoice,
+        }
+
+    def get_payments_for_invoice(self, invoice_number):
+        """Returns all payments for an invoice, oldest first.
+        Used by the payment receipt and 'how much has been paid'
+        queries."""
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payment_receipt_number, invoice_number,
+                           customer_name, amount, paid_on, method, created_at
+                    FROM payments
+                    WHERE invoice_number = %s
+                    ORDER BY paid_on ASC, created_at ASC
+                    """,
+                    (invoice_number,)
+                )
+                rows = cursor.fetchall()
+
+        results = []
+        for row in rows:
+            row = dict(row)
+            # paid_on is a DATE column — serialize like the rest
+            if isinstance(row["paid_on"], (date, datetime)):
+                row["paid_on"] = row["paid_on"].isoformat()
+            results.append(row)
+
+        return results
 
 
 record_service = RecordKeeperService()
