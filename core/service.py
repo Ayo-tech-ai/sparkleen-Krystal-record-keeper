@@ -149,31 +149,55 @@ class RecordKeeperService:
 
     def get_business_summary(self, start_date, end_date):
         """
-        Returns total revenue and number of drop-offs for records
-        whose dropoff_date falls between start_date and end_date
-        (both inclusive).
+        Returns a small business dashboard for a period, all
+        dates inclusive.
+
+        - total_revenue: sum of total_amount for drop-offs whose
+          dropoff_date is in the period (what was billed).
+        - dropoff_count: number of drop-offs in the period.
+        - total_collected: sum of payments whose paid_on is in
+          the period (actual cash received, regardless of when
+          the job was dropped off).
+        - total_outstanding: sum of balance for drop-offs whose
+          dropoff_date is in the period (current unpaid on those
+          specific jobs).
 
         start_date and end_date are 'YYYY-MM-DD' strings.
         """
         with get_connection() as connection:
             with connection.cursor() as cursor:
+                # Billed + count + outstanding: all from dropoff_records
                 cursor.execute(
                     """
                     SELECT
                         COALESCE(SUM(total_amount), 0) AS total_revenue,
+                        COALESCE(SUM(balance), 0) AS total_outstanding,
                         COUNT(*) AS dropoff_count
                     FROM dropoff_records
                     WHERE dropoff_date BETWEEN %s AND %s
                     """,
                     (start_date, end_date)
                 )
-                row = cursor.fetchone()
+                billed_row = cursor.fetchone()
+
+                # Collected: from payments, filtered by paid_on
+                cursor.execute(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total_collected
+                    FROM payments
+                    WHERE paid_on BETWEEN %s AND %s
+                    """,
+                    (start_date, end_date)
+                )
+                collected_row = cursor.fetchone()
 
         return {
             "start_date": start_date,
             "end_date": end_date,
-            "total_revenue": float(row["total_revenue"]),
-            "dropoff_count": int(row["dropoff_count"]),
+            "total_revenue": float(billed_row["total_revenue"]),
+            "total_outstanding": float(billed_row["total_outstanding"]),
+            "dropoff_count": int(billed_row["dropoff_count"]),
+            "total_collected": float(collected_row["total_collected"]),
         }
 
     # ---------------- PAYMENTS ----------------
