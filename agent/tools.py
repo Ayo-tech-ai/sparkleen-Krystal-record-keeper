@@ -166,3 +166,37 @@ def get_payments_for_invoice(invoice_number: str):
         invoice_number: Exact invoice number, e.g. "SC-20261103-001".
     """
     return record_service.get_payments_for_invoice(invoice_number)
+
+
+def get_outstanding_balances(customer_name: Optional[str] = None):
+    """
+    Return all customers who currently owe money, grouped by
+    customer name, plus the grand total owed.
+
+    Use this when the owner asks any of:
+      - "Who owes me?"
+      - "How much am I owed right now?"
+      - "How much does Chioma owe?"
+      - "Show me all outstanding balances."
+
+    If `customer_name` is given, only that customer's open
+    invoices are returned (case-insensitive, partial match). If
+    not given, every customer with a balance is returned.
+
+    Returns a dict with:
+      total_outstanding: total owed across all returned customers
+      customer_count: number of customers who owe
+      customers: list of per-customer dicts, each with
+        customer_name, invoice_count, outstanding, and invoices
+        (list of {invoice_number, balance, dropoff_date}),
+        sorted with the biggest debtor first.
+
+    If nobody owes money, total_outstanding is 0.0 and
+    customers is an empty list — this is not an error.
+
+    Args:
+        customer_name: optional partial name to filter by.
+    """
+    return record_service.get_outstanding_balances(
+        customer_name=customer_name,
+    )
