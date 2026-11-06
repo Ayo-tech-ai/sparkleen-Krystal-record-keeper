@@ -93,14 +93,23 @@ def get_receipt_for_invoice(invoice_number: str):
 
 def get_business_summary(start_date: str, end_date: str):
     """
-    Get total revenue and number of drop-offs for a period.
+    Get a business dashboard for a period: billed (total revenue),
+    actual cash collected, and outstanding on those jobs.
 
     Use this when the owner asks how business was for a period —
-    e.g. "this week", "last week", "last month", or any date range.
+    e.g. "this week", "last week", "last month", or any range.
 
     IMPORTANT: Resolve the period into exact start and end dates
     BEFORE calling this tool. Weeks run Monday to Sunday. Months
     are calendar months. Both dates are inclusive.
+
+    The three money numbers mean different things:
+    - total_revenue   = what was billed (drop-offs in the period)
+    - total_collected = what was actually paid (payments received
+                        in the period, regardless of when the job
+                        was dropped off)
+    - total_outstanding = what is still owed on jobs from this
+                        period (current unpaid balance)
 
     Args:
         start_date: First day of the period, exact YYYY-MM-DD.
@@ -110,7 +119,6 @@ def get_business_summary(start_date: str, end_date: str):
         start_date=start_date,
         end_date=end_date,
     )
-
 
 def record_payment(
     invoice_number: str,
