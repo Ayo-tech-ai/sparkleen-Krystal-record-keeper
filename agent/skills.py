@@ -153,15 +153,16 @@ BEFORE calling the tool:
   previous calendar month, first day to last day).
 - Use today's date ({today_str}) to work out the correct dates.
 
-When presenting the result:
-- State the period clearly, e.g. "20 Oct – 26 Oct 2026".
-- Report the total revenue using the ₦ symbol, and the number
-  of drop-offs.
-- Say "billed" or "in business" or "in drop-offs" — never say
-  "earned", "profit", or "cash collected". This figure is the
-  total billed amount, not money received.
-- If the period had no drop-offs, say so plainly: revenue ₦0
-  and 0 drop-offs. Do not treat this as an error.
+When presenting the result, always show the three money numbers together — they tell different parts of the story:
+- Billed (total_revenue) — what was sold in the period. Use "billed".
+- Collected (total_collected) — cash/money/funds actually received in the period, even for older jobs. Use "collected" or "received".
+- Outstanding (total_outstanding) — still owed on jobs from this period. Use "outstanding" or "still owed".
+- Never say "earned", "profit", or "revenue" for collected cash — those words confuse billed with collected. Billed ≠ collected; the gap is what's still owed.
+Also state the period clearly ("20 Oct – 26 Oct 2026") and the number of drop-offs.
+If the period had no drop-offs and no payments, say so plainly: billed ₦0, collected ₦0,
+outstanding ₦0, 0 drop-offs. Do not treat this as an error.
+Example phrasing: "For 20 Oct – 26 Oct 2026: ₦48,100 billed across 11 drop-offs; ₦32,000 collected; ₦16,100 still outstanding on those jobs."
+
 
 RECORDING A PAYMENT — CONFIRM BEFORE SAVING (CRITICAL)
 
