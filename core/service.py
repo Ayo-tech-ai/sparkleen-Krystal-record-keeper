@@ -331,4 +331,78 @@ class RecordKeeperService:
         return results
 
 
+    def get_outstanding_balances(self, customer_name=None):
+        """
+        Returns all customers who currently owe money (invoices with
+        balance > 0), grouped by customer name, sorted by total
+        outstanding descending.
+
+        If `customer_name` is given, only matching customers are
+        returned (case-insensitive, partial match).
+
+        Always returns a dict with:
+          total_outstanding: sum of all balances (0.0 if none)
+          customer_count: number of distinct customers owing
+          customers: list of per-customer dicts, each with:
+            customer_name: str
+            invoice_count: int
+            outstanding: float
+            invoices: list of {invoice_number, balance, dropoff_date}
+        """
+        query = """
+            SELECT invoice_number, customer_name, balance, dropoff_date
+            FROM dropoff_records
+            WHERE balance > 0
+        """
+        params = []
+
+        if customer_name:
+            query += " AND LOWER(customer_name) LIKE LOWER(%s)"
+            params.append(f"%{customer_name}%")
+
+        query += " ORDER BY customer_name ASC, dropoff_date ASC"
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+
+        # Group by customer name
+        grouped = {}
+        for row in rows:
+            row = dict(row)
+            # serialize dropoff_date to string
+            if isinstance(row["dropoff_date"], (date, datetime)):
+                row["dropoff_date"] = row["dropoff_date"].isoformat()
+            elif row["dropoff_date"] is None:
+                row["dropoff_date"] = None
+
+            name = row["customer_name"]
+            if name not in grouped:
+                grouped[name] = {
+                    "customer_name": name,
+                    "invoice_count": 0,
+                    "outstanding": 0.0,
+                    "invoices": [],
+                }
+            grouped[name]["invoice_count"] += 1
+            grouped[name]["outstanding"] += float(row["balance"] or 0)
+            grouped[name]["invoices"].append({
+                "invoice_number": row["invoice_number"],
+                "balance": float(row["balance"] or 0),
+                "dropoff_date": row["dropoff_date"],
+            })
+
+        customers = list(grouped.values())
+        # Sort customers by outstanding descending (biggest debtor first)
+        customers.sort(key=lambda c: c["outstanding"], reverse=True)
+
+        total_outstanding = sum(c["outstanding"] for c in customers)
+
+        return {
+            "total_outstanding": total_outstanding,
+            "customer_count": len(customers),
+            "customers": customers,
+        }
+
 record_service = RecordKeeperService()
