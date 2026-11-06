@@ -29,6 +29,23 @@ def generate_invoice_number():
     next_seq = count_today + 1
     return f"SC-{date_part}-{next_seq:03d}"
 
+def generate_payment_receipt_number():
+    """Generates the next payment receipt number for today in
+    PAY-YYYYMMDD-NNN format."""
+    date_part = datetime.now(WAT).strftime("%Y%m%d")
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS count FROM payments "
+                "WHERE payment_receipt_number LIKE %s",
+                (f"PAY-{date_part}-%",)
+            )
+            count_today = cursor.fetchone()["count"]
+
+    next_seq = count_today + 1
+    return f"PAY-{date_part}-{next_seq:03d}"
+
 
 def _to_int(value, field_name):
     """Safely converts a value to int, tolerating string input from the model."""
