@@ -37,7 +37,8 @@ def get_connection():
 
 
 def init_db():
-    """Creates the dropoff_records table if it doesn't already exist."""
+    """Creates the dropoff_records and payments tables if they don't
+    already exist."""
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -55,6 +56,19 @@ def init_db():
                     dropoff_date DATE NOT NULL,
                     collection_date DATE,
                     late_fee_applied BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS payments (
+                    id BIGSERIAL PRIMARY KEY,
+                    payment_receipt_number TEXT UNIQUE NOT NULL,
+                    invoice_number TEXT NOT NULL
+                        REFERENCES dropoff_records(invoice_number),
+                    customer_name TEXT NOT NULL,
+                    amount DOUBLE PRECISION NOT NULL,
+                    paid_on DATE NOT NULL,
+                    method TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
