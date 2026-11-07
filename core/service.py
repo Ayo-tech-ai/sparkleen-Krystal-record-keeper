@@ -58,6 +58,7 @@ class RecordKeeperService:
 
         with get_connection() as connection:
             with connection.cursor() as cursor:
+                # 1. Insert the drop-off row
                 cursor.execute(
                     """
                     INSERT INTO dropoff_records
@@ -71,6 +72,24 @@ class RecordKeeperService:
                      service_type, dropoff_date, collection_date,
                      False, now_wat_str())
                 )
+
+                # 2. If a payment was made at drop-off, log it in the
+                #    payments ledger so "collected" and payment history
+                #    are accurate. No PDF is generated here — the
+                #    drop-off receipt is the proof for this payment.
+                if amount_paid > 0:
+                    payment_receipt_number = generate_payment_receipt_number()
+                    cursor.execute(
+                        """
+                        INSERT INTO payments
+                        (payment_receipt_number, invoice_number,
+                         customer_name, amount, paid_on, method)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (payment_receipt_number, invoice_number,
+                         customer_name, amount_paid, dropoff_date,
+                         "at drop-off")
+                    )
 
         return _serialize_record({
             "success": True,
